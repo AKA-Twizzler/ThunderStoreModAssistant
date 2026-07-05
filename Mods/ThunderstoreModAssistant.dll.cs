@@ -538,29 +538,51 @@ namespace ThunderstoreModAssistant.Utilities
 
 		public static void DownloadThumbnail(string url, Action<Texture> action)
 		{
-			//IL_0021: Unknown result type (might be due to invalid IL or missing references)
-			//IL_002b: Expected O, but got Unknown
-			Action<Texture> action2 = action;
-			UnityWebRequest webRequest = UnityWebRequestTexture.GetTexture(url);
-			webRequest.downloadHandler = (DownloadHandler)new DownloadHandlerTexture(true);
-			UnityWebRequestAsyncOperation val = webRequest.SendWebRequest();
-			((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + Action<AsyncOperation>.op_Implicit((Action<AsyncOperation>)delegate
+			if (string.IsNullOrEmpty(url))
 			{
-				ThumbnailCompletionJob item = new ThumbnailCompletionJob
+				return;
+			}
+			System.Threading.Tasks.Task.Run(async delegate
+			{
+				try
 				{
-					callback = delegate
+					var handler = new System.Net.Http.SocketsHttpHandler
 					{
-						//IL_0007: Unknown result type (might be due to invalid IL or missing references)
-						//IL_000d: Invalid comparison between Unknown and I4
-						if ((int)webRequest.result == 1)
+						ConnectCallback = async (context, cancellationToken) =>
 						{
-							DownloadHandlerTexture val2 = ((Il2CppObjectBase)webRequest.downloadHandler).TryCast<DownloadHandlerTexture>();
-							Texture texture = (Texture)(object)val2.texture;
-							action2(texture);
-						}
+							var hostEntry = await System.Net.Dns.GetHostEntryAsync(context.DnsEndPoint.Host, cancellationToken);
+							var ipv4 = hostEntry.AddressList.First(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+							var socket = new System.Net.Sockets.Socket(ipv4.AddressFamily, System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp)
+							{
+								NoDelay = true
+							};
+							await socket.ConnectAsync(new System.Net.IPEndPoint(ipv4, context.DnsEndPoint.Port), cancellationToken);
+							return new System.Net.Sockets.NetworkStream(socket, ownsSocket: true);
+						},
+						ConnectTimeout = TimeSpan.FromSeconds(15)
+					};
+					using (var client = new System.Net.Http.HttpClient(handler)
+					{
+						Timeout = TimeSpan.FromSeconds(15)
+					})
+					{
+						client.DefaultRequestHeaders.UserAgent.ParseAdd("ThunderstoreModAssistant/1.2.2");
+						byte[] imageBytes = await client.GetByteArrayAsync(url);
+						MainThreadManager.QueueAction(delegate
+						{
+							try
+							{
+								Texture2D texture = new Texture2D(2, 2);
+								if (UnityEngine.ImageConversion.LoadImage(texture, imageBytes))
+								{
+									action(texture);
+								}
+							}
+							catch { }
+						});
 					}
-				};
-				thumbnailCompletionJobs.Enqueue(item);
+				}
+				catch { }
 			});
 		}
 	}
