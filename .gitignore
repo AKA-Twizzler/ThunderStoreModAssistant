@@ -1,0 +1,14 @@
+bin/
+obj/
+*.user
+*.suo
+*.sln.docstates
+.vs/
+*.nupkg
+*.dll
+*.exe
+*.pdb
+*.cache
+packages/
+*.nuget.props
+*.nuget.targets
